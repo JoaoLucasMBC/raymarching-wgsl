@@ -117,34 +117,47 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
     var all_objects_count = spheresCount + boxesCount + torusCount;
     var result = vec4f(vec3f(1.0), d) ;
 
-    for (var i = 0; i < all_objects_count; i = i + 1)
+    // mendelbulb
+    if (uniforms[18] > 0.0)
     {
-      // get shape and shape order (shapesinfo)
-      // shapesinfo has the following format:
-      // x: shape type (0: sphere, 1: box, 2: torus)
-      // y: shape index
-      // order matters for the operations, they're sorted on the CPU side
-      var info = shapesinfob[i];
-      var shape = shapesb[i32(info.y)];
-
-      var p_ = transform_p(p - shape.transform_animated.xyz, vec2f(shape.op.z, shape.op.w));
-
-      if (info.x < 1.0)
+      var bulb = sdf_mandelbulb(p);
+      result = vec4f(vec3f(bulb.y),  bulb.x);
+    }
+    else if (uniforms[19] > 0.0)
+    {
+      var weird = sdf_weird_thing(p, uniforms[19]);
+      result = vec4f(vec3f(1.0), weird);
+    }
+    else
+    {
+      for (var i = 0; i < all_objects_count; i = i + 1)
       {
-        d = sdf_sphere(p_, shape.radius, shape.quat);
-      }
-      else if (info.x < 2.0)
-      {
-        d = sdf_round_box(p_, shape.radius.xyz, shape.radius.w, shape.quat);
-      }
-      else
-      {
-        // call sdf_torus
-        d = sdf_torus(p_, shape.radius.xy, shape.quat);
-      }
+        // get shape and shape order (shapesinfo)
+        // shapesinfo has the following format:
+        // x: shape type (0: sphere, 1: box, 2: torus)
+        // y: shape index
+        // order matters for the operations, they're sorted on the CPU side
+        var info = shapesinfob[i];
+        var shape = shapesb[i32(info.y)];
 
-      // call op function with the shape operation
-      result = op(shape.op.x, d, result.w, shape.color.xyz, result.xyz, shape.op.y);
+        var p_ = transform_p(p - shape.transform_animated.xyz, vec2f(shape.op.z, shape.op.w));
+
+        if (info.x < 1.0)
+        {
+          d = sdf_sphere(p_, shape.radius, shape.quat);
+        }
+        else if (info.x < 2.0)
+        {
+          d = sdf_round_box(p_, shape.radius.xyz, shape.radius.w, shape.quat);
+        }
+        else
+        {
+          d = sdf_torus(p_, shape.radius.xy, shape.quat);
+        }
+
+        // call op function with the shape operation
+        result = op(shape.op.x, d, result.w, shape.color.xyz, result.xyz, shape.op.y);
+      }
     }
 
     return result;
@@ -159,6 +172,10 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
   var min_d = MAX_DIST;
   var color = vec3f(0.0);
   var march_step = uniforms[22];
+
+  var has_outline = uniforms[26];
+  var outline_w = uniforms[27];
+  var outline_color = vec3f(1.0) * uniforms[28];
   
   for (var i = 0; i < max_marching_steps; i = i + 1)
   {
@@ -186,6 +203,12 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
       depth = depth + result.w;
   }
 
+  // check if we should draw the outline of something
+  if (has_outline > 0.0 && min_d < outline_w)
+  {
+    return march_output(outline_color, depth, true);
+  }
+
   return march_output(vec3f(0.0), MAX_DIST, false);
 }
 
@@ -208,14 +231,15 @@ fn get_soft_shadow(ro: vec3f, rd: vec3f, tmin: f32, tmax: f32, k: f32) -> f32
   for (var i = 0; i < 256 && t < tmax; i = i + 1)
   {
     var h = scene(ro + rd * t).w;
-    if (h < 0.001)
+    res = min(res, h/(k*t));
+    t += clamp(h, 0.005, 0.5);
+    if (res < -1.0 || t > tmax)
     {
-      return 0.0;
+      break;
     }
-    res = min(res, k * h / t);
-    t += h;
   }
-  return clamp(res, 0.0, 1.0);
+  res = max(res, -1.0);
+  return 0.25 * (1.0 + res)*(1.0 + res)*(2.0 - res);
 }
 
 fn get_AO(current: vec3f, normal: vec3f) -> f32
@@ -271,7 +295,7 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
   var diff_color = diff * obj_color * sun_color;
 
   // do shadow
-  var shadow = get_soft_shadow(current + normal * 0.001, light_direction, 0.001, length(light_position - current), 32.0);
+  var shadow = get_soft_shadow(current + normal * 0.001, light_direction, uniforms[24], uniforms[25], uniforms[21]);
   diff_color *= shadow;
 
   // do ambient occlusion
@@ -351,7 +375,11 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   var depth = march_result.depth;
 
   var color = vec3f(0.0);
-  if (depth < MAX_DIST)
+  if (march_result.outline)
+  {
+    color = march_result.color;
+  }
+  else if (depth < MAX_DIST)
   {
     // move ray based on the depth
     var p = ro + rd * march_result.depth;
@@ -360,7 +388,7 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   }
   else 
   {
-    // get ambient light
+    // get ambient light se não bateu em nada
     color = get_ambient_light(vec3f(uniforms[13], uniforms[14], uniforms[15]), int_to_rgb(i32(uniforms[16])), rd);
   }
   

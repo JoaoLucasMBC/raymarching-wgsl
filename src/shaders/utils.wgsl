@@ -1,4 +1,3 @@
-
 fn linear_to_gamma_channel(channel: f32) -> f32
 {
   return pow(channel, 0.4545);
@@ -92,6 +91,7 @@ fn q_inverse(q: vec4f) -> vec4f
 
 fn rotate_vector(v: vec3f, r: vec4f) -> vec3f
 {
+  //return v;
   var r_c = r * vec4f(-1.0, -1.0, -1.0, 1.0);
   return qmul(r, qmul(vec4f(v, 0.0), r_c)).xyz;
 }

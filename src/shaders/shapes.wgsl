@@ -64,3 +64,39 @@ fn sdf_weird_thing(p_: vec3f, s: f32) -> f32
 
   return 0.3 * abs(p.y) / scale;
 }
+
+// THIS SDF FUNCTION WAS BASED ON THE FOLLOWING SHADER FROM SHADERTOY:
+// https://www.shadertoy.com/view/3syXRV
+// The SDF function was converted to WGSL with the support of ChatGPT
+fn sdf_mandelbrot(pos: vec3f, time: f32) -> vec2f {
+    var iteration = 15;
+    var bailout = 5.0;
+    var z = pos;
+    var dr = 1.0;
+    var r = 0.0;
+    var power = 7.0 + sin(time / 3.0) * 5.0;
+
+    var i = 0;
+    for (i = 0; i < iteration; i = i + 1) {
+        r = length(z);
+        if (r > bailout) {
+            break;
+        }
+
+        // Convert to polar coordinates
+        var theta = acos(z.z / r);
+        var phi = atan2(z.y, z.x);
+        dr = pow(r, power - 1.0) * power * dr + 1.0;
+
+        // Scale and rotate the point
+        var zr = pow(r, power);
+        theta = theta * power;
+        phi = phi * power;
+
+        // Convert back to Cartesian coordinates
+        z = zr * vec3f(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+        z = z + pos;
+    }
+    let distance = 0.5 * log(r) * r / dr;
+    return vec2f(distance, f32(i) / f32(iteration));
+}

@@ -55,6 +55,7 @@ const uniforms = {
     outlineColor: 0.0, // 28
     backgroundColor2: 0.0, // 29
     backgroundColor3: 0.0, // 30
+    mandelbrot: 0, // 31
 }
 
 const uniformsCount = Object.keys(uniforms).length;
@@ -212,6 +213,8 @@ scenesFolder.add({ PrintScene: () => {
     scene += `\t\tsunColor: [${sunColor.object.r}, ${sunColor.object.g}, ${sunColor.object.b}],\n`;
     scene += `\t\tbackgroundColor2: [${backgroundColor2.object.r}, ${backgroundColor2.object.g}, ${backgroundColor2.object.b}],\n`;
     scene += `\t\tbackgroundColor3: [${backgroundColor3.object.r}, ${backgroundColor3.object.g}, ${backgroundColor3.object.b}],\n`;
+    // Mandelbrot
+    scene += `\t\tmandelbrot: ${uniforms.mandelbrot},\n`;
     scene += "\t};\n";
     scene += "}\n";
     
@@ -227,6 +230,7 @@ uniformsFolder.add(uniforms, 'marchingStep').name("Marching Step").step(0.01).li
 uniformsFolder.add({ ShowFloor: true }, 'ShowFloor').name("Show Floor").listen().onChange( function() { uniforms.showFloor = this.object.ShowFloor ? 1 : 0; });
 uniformsFolder.add({ Mandelbulb: false }, 'Mandelbulb').name("Mandelbulb").listen().onChange( function() { uniforms.mandelbulb = this.object.Mandelbulb ? 1 : 0; });
 uniformsFolder.add({ WeirdScene: false }, 'WeirdScene').name("Weird Scene").listen().onChange( function() { uniforms.weirdScene = this.object.WeirdScene ? 1 : 0; });
+uniformsFolder.add({ Mandelbrot: false }, 'Mandelbrot').name("Mandelbrot").listen().onChange( function() { uniforms.mandelbrot = this.object.Mandelbrot ? 1 : 0; });
 
 let shadowsFolder = gui.addFolder("Shadows");
 shadowsFolder.add(uniforms, 'softShadowK').name("Soft Shadow K").step(0.01).listen();
@@ -456,14 +460,14 @@ async function getScene(index)
     let backgroundColor, maxMarchingSteps, 
         showFloor, mandelbulb, weirdScene, 
         farPlane, softShadowK, marchingStep, 
-        outlinePostProcess, outlineWidth, sunColor, backgroundColor2, backgroundColor3;
+        outlinePostProcess, outlineWidth, sunColor, backgroundColor2, backgroundColor3, mandelbrot;
 
     ({ 
         spheres, boxes, toruses, 
         backgroundColor, maxMarchingSteps, 
         showFloor, mandelbulb, weirdScene, 
         farPlane, softShadowK, marchingStep, 
-        outlinePostProcess, outlineWidth, sunColor, backgroundColor2, backgroundColor3
+        outlinePostProcess, outlineWidth, sunColor, backgroundColor2, backgroundColor3, mandelbrot
     } = await getAvailableScene(index, availableScenes));
 
     uniforms.maxMarchingSteps = maxMarchingSteps;
@@ -475,6 +479,7 @@ async function getScene(index)
     uniforms.marchingStep = marchingStep;
     uniforms.outlinePostProcess = outlinePostProcess;
     uniforms.outlineWidth = outlineWidth;
+    uniforms.mandelbrot = mandelbrot;
 
     generateBackgroundAndSunColor(backgroundColor, backgroundColor2, backgroundColor3, sunColor);
     writeBuffers();

@@ -128,15 +128,23 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
       var weird = sdf_weird_thing(p, uniforms[19]);
       result = vec4f(vec3f(1.0), weird);
     }
+    // mandelbrot
+    else if (uniforms[31] > 0.0)
+    {
+      var f = sdf_mandelbrot(p, uniforms[0]);
+
+      // Dinamic color based on time!! (good old shader toy days)
+      var color = vec3f(
+          0.5 + 0.5 * sin(f.y * 12.12 + uniforms[0]),
+          0.5 + 0.5 * cos(f.y * 12.12 + uniforms[0]),
+          0.5 + 0.5 * tan(f.y * 12.12 + uniforms[0])
+      );
+      result = vec4f(color, f.x);
+    }
     else
     {
       for (var i = 0; i < all_objects_count; i = i + 1)
       {
-        // get shape and shape order (shapesinfo)
-        // shapesinfo has the following format:
-        // x: shape type (0: sphere, 1: box, 2: torus)
-        // y: shape index
-        // order matters for the operations, they're sorted on the CPU side
         var info = shapesinfob[i];
         var shape = shapesb[i32(info.y)];
 
@@ -155,7 +163,6 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
           d = sdf_torus(p_, shape.radius.xy, shape.quat);
         }
 
-        // call op function with the shape operation
         result = op(shape.op.x, d, result.w, shape.color.xyz, result.xyz, shape.op.y);
       }
     }
@@ -177,10 +184,11 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
   var outline_w = uniforms[27];
   var outline_color = vec3f(1.0) * uniforms[28];
   
+  // NOTE: if you want to remove the distortion effect around spheres, multiply max_marching_steps by 3 
+  // (this significantly affects performance, so the default value is kept)
   for (var i = 0; i < max_marching_steps; i = i + 1)
   {
       // raymarch algorithm
-      // call scene function and march
       var ro_ = ro + rd * depth;
       
       var result = scene(ro_);
@@ -214,6 +222,7 @@ fn march(ro: vec3f, rd: vec3f) -> march_output
 
 fn get_normal(p: vec3f) -> vec3f
 {
+  // Random epsilon value to estimate the normal
   var e = 0.0001;
   return normalize(vec3(
     scene(vec3(p.x + e, p.y, p.z)).w - scene(vec3(p.x - e, p.y, p.z)).w,
@@ -223,6 +232,7 @@ fn get_normal(p: vec3f) -> vec3f
 }
 
 // https://iquilezles.org/articles/rmshadows/
+// Soft shadow function by Inigo Quilez
 fn get_soft_shadow(ro: vec3f, rd: vec3f, tmin: f32, tmax: f32, k: f32) -> f32
 {
   var res = 1.0;
@@ -281,7 +291,6 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
   var ambient = get_ambient_light(light_position, sun_color, rd);
   var normal = get_normal(current);
 
-  // calculate light based on the normal
   // if the object is too far away from the light source, return ambient light
   if (length(current) > uniforms[20] + uniforms[8])
   {
@@ -290,15 +299,15 @@ fn get_light(current: vec3f, obj_color: vec3f, rd: vec3f) -> vec3f
 
   var light_direction = normalize(light_position - current);
   
-  // do the diffuse
+  // diffuse
   var diff = max(0.0, dot(normal, light_direction));
   var diff_color = diff * obj_color * sun_color;
 
-  // do shadow
+  // shadow
   var shadow = get_soft_shadow(current + normal * 0.001, light_direction, uniforms[24], uniforms[25], uniforms[21]);
   diff_color *= shadow;
 
-  // do ambient occlusion
+  // ambient occlusion
   var occ = get_AO(current, normal);
 
   var color = ambient * obj_color;
@@ -317,7 +326,8 @@ fn set_camera(ro: vec3f, ta: vec3f, cr: f32) -> mat3x3<f32>
   return mat3x3<f32>(cu, cv, cw);
 }
 
-// why amplitude? Font: GPT
+// This function was created assisted by ChatGPT
+// based on the motions observed on https://gubebra.itch.io/raymarching-webgpu
 fn animate(val: vec3f, amplitude: vec3f, time_scale: f32, offset: f32) -> vec3f {
     var angle = time_scale * offset;
     var x = amplitude.x * sin(angle);
@@ -352,6 +362,9 @@ fn preprocess(@builtin(global_invocation_id) id : vec3u)
   shape.quat = quaternion_from_euler(animated_rotation);
 
   // I HATE THIS SHIT!!
+  // Lost so much time here :/
+  // I did not know that just updating the shape was actually not changing the original shape in the vector
+  // Thought shape was a pointer to the original shape, not a copy that had to be reassigned to the vector :/
   shapesb[i32(id.x)] = shape;
 }
 
@@ -379,6 +392,8 @@ fn render(@builtin(global_invocation_id) id : vec3u)
   var depth = march_result.depth;
 
   var color = vec3f(0.0);
+
+  // Check for outline first
   if (march_result.outline)
   {
     color = march_result.color;

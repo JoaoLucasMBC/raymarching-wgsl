@@ -450,4 +450,30 @@ async function Weird()
     };
 }
 
+async function BadTrip()
+{
+	return {
+		spheres: [
+		],
+		boxes: [
+		],
+		toruses: [
+		],
+		backgroundColor: [0.10196078431372549, 0.44313725490196076, 1],
+		maxMarchingSteps: 100,
+		showFloor: 0,
+		mandelbulb: 0,
+		weirdScene: 0,
+		farPlane: 700,
+		softShadowK: 0.24,
+		marchingStep: 1,
+		outlinePostProcess: 0,
+		outlineWidth: 0.05,
+		sunColor: [0.98, 1, 0.9],
+		backgroundColor2: [0.7, 0.75, 0.85],
+		backgroundColor3: [0.418, 0.394, 0.372],
+		mandelbrot: 1,
+	};
+}
+
 export { getAvailableScene };

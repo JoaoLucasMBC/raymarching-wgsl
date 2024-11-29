@@ -148,7 +148,7 @@ fn scene(p: vec3f) -> vec4f // xyz = color, w = distance
         }
         else if (info.x < 2.0)
         {
-          d = sdf_round_box(p_, shape.radius.xyz, shape.radius.w, shape.quat);
+          d = sdf_round_box(p_, shape.radius.xyz + shape.radius.w, shape.radius.w, shape.quat);
         }
         else
         {
@@ -318,9 +318,13 @@ fn set_camera(ro: vec3f, ta: vec3f, cr: f32) -> mat3x3<f32>
 }
 
 // why amplitude? Font: GPT
-fn animate(val: vec3f, amplitude: vec3f, time_scale: f32, offset: f32) -> vec3f
-{
-  return val + amplitude * sin(time_scale * offset);
+fn animate(val: vec3f, amplitude: vec3f, time_scale: f32, offset: f32) -> vec3f {
+    var angle = time_scale * offset;
+    var x = amplitude.x * sin(angle);
+    var z = amplitude.z * cos(angle);
+    var y = amplitude.y * cos(angle);
+
+    return val + vec3f(x, y, z);
 }
 
 @compute @workgroup_size(THREAD_COUNT, 1, 1)
